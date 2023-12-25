@@ -14,8 +14,9 @@ fn part1a() -> Result<(), String>{
 .664.598..")?,4361);
     Ok(())
 }
+
 #[test]
-fn tests() -> Result<(), String>{
+fn part1_tests() -> Result<(), String>{
     let tests = [
         ("*1", 1),
         ("...\n.1.\n...", 0),
@@ -30,6 +31,7 @@ fn tests() -> Result<(), String>{
     }
     Ok(())
 }
+
 #[test]
 fn part1b() -> Result<(), String>{
     let str = read_to_string("inputs/day03.txt").map_err(|x|x.to_string())?;
@@ -39,26 +41,26 @@ fn part1b() -> Result<(), String>{
 }
 
 fn run_part1(input: &str) -> Result<i32, String>{   
-    let mut symbol_lines : Vec<Vec<Symbol>> = Vec::new();
+    let mut segment_lines : Vec<Vec<Segment>> = Vec::new();
     let mut index_lines : Vec<Vec<usize>> = Vec::new();
     for line in input.lines(){
-        let symbols = parse_symbols(line);
+        let segments = parse_segments(line);
         let mut indexes = Vec::new();
-        for sym in &symbols{
-            match sym.ty{
+        for seg in &segments{
+            match seg.ty{
                 Type::Symbol => {
-                    indexes.push(sym.start);
+                    indexes.push(seg.start);
                 },
                 _ => {},
             }
         }
         index_lines.push(indexes);
-        symbol_lines.push(symbols);
+        segment_lines.push(segments);
     } 
 
     let mut sum = 0;
-    for index in 0..symbol_lines.len(){
-        let symbol_line = &symbol_lines[index];
+    for index in 0..segment_lines.len(){
+        let segment_line = &segment_lines[index];
         
         let current = &index_lines[index];
         
@@ -72,15 +74,15 @@ fn run_part1(input: &str) -> Result<i32, String>{
             next = Some(&index_lines[index+1]);
         }
 
-        for sym in 0..symbol_line.len(){
-            let symbol = &symbol_line[sym];
+        for seg in 0..segment_line.len(){
+            let symbol = &segment_line[seg];
             match symbol.ty{
                 Type::Number => {},
                 _ => {continue;}
             } 
 
-            let lower_bound = if symbol.start == 0 { 0 } else { symbol.start -1};
-            let upper_bound = symbol.capture.len() + symbol.start ;
+            let lower_bound = lower_bound(symbol);
+            let upper_bound = upper_bound(symbol);
             let mut is_adjacent = false;
             
             // if there is a previous line, process it
@@ -136,18 +138,142 @@ fn run_part1(input: &str) -> Result<i32, String>{
     Ok(sum)
 }
 
+
+#[test]
+fn part2a() -> Result<(), String>{
+    assert_eq!(run_part2("467..114..
+...*......
+..35..633.
+......#...
+617*......
+.....+.58.
+..592.....
+......755.
+...$.*....
+.664.598..")?, 467835);
+    Ok(())
+}
+
+#[test]
+fn part2_tests() -> Result<(), String>{
+    let tests = [
+        ("1*1", 1),
+        ("...\n.1.\n...", 0),
+        ("*..\n..1\n...", 0),
+        ("10..\n...*\n10..", 0),
+        ("10..\n*10.\n10..",0),
+        ("....\n2*2.\n....",4),
+        ("10..\n..*.\n10..",100),
+    ];
+    for (s,count) in tests{
+        assert_eq!(run_part2(s)?, count);
+    }
+    Ok(())
+}
+
+#[test]
+fn part2b() -> Result<(), String>{
+    let str = read_to_string("inputs/day03.txt").map_err(|x|x.to_string())?;
+    let result = run_part2(&str)?;
+    assert_eq!(result, 79613331);
+    Ok(())
+}
+
+fn run_part2(input: &str) -> Result<usize, String>{
+    let mut star_lines = Vec::new();
+    let mut number_lines = Vec::new();
+
+    for line in input.lines(){
+        let segments = parse_segments(line);
+        let mut stars = Vec::new();
+        let mut numbers = Vec::new();
+        for seg in segments{
+            match seg.ty{
+                Type::Number=> numbers.push(seg),
+                Type::Symbol if seg.capture == "*"=>{ stars.push(seg);},
+                _ => {}
+            }
+        }
+        star_lines.push(stars);
+        number_lines.push(numbers);
+    }
+
+    let mut sum = 0;
+    for line_no in 0..star_lines.len(){
+        let mut prev = None;
+        let mut next = None;
+        if line_no > 0 { 
+            prev = Some(&number_lines[line_no-1]);
+        }
+        if line_no < number_lines.len() -1 { 
+            next = Some(&number_lines[line_no+1]);
+        }
+        let stars = &star_lines[line_no];
+        let current = &number_lines[line_no];
+
+        for star in stars{
+            let mut numbers: Vec<usize> = Vec::new();
+            if prev.is_some(){                
+                for num in prev.unwrap(){
+                    let lower_bound = lower_bound(num);
+                    let upper_bound = upper_bound(num);
+                    if lower_bound <= star.start && star.start <= upper_bound{
+                        numbers.push(num.capture.parse::<usize>().unwrap());
+                    }
+                }
+            }
+
+            for num in current{
+                let lower_bound = lower_bound(num);
+                let upper_bound = upper_bound(num);
+                if lower_bound <= star.start && star.start <= upper_bound{
+                    numbers.push(num.capture.parse::<usize>().unwrap());
+                }
+            }
+            
+            if next.is_some(){
+                for num in next.unwrap(){
+                    let lower_bound = lower_bound(num);
+                    let upper_bound = upper_bound(num);
+                    if lower_bound <= star.start && star.start <= upper_bound{                        
+                        numbers.push(num.capture.parse::<usize>().unwrap());
+                    }
+                }
+            }
+
+            if numbers.len() == 2{
+                sum += numbers[0] * numbers[1];
+            }
+        }
+        
+    }
+    Ok(sum)
+}
+
+fn upper_bound(seg: &Segment) -> usize{    
+    seg.capture.len() + seg.start
+}
+
+fn lower_bound(seg: &Segment) -> usize{
+    if seg.start == 0 { 
+        0 
+    } else { 
+        seg.start -1
+    }
+}
+
 enum Type {
     Symbol,
     Number,
     Dots,
 }
-struct Symbol {
+struct Segment {
     capture: String,
     start: usize,
     ty: Type,
 }
 
-fn parse_symbols(line: &str) -> Vec<Symbol>{
+fn parse_segments(line: &str) -> Vec<Segment>{
     let mut symbols = Vec::new();
     let mut iter = line.char_indices().peekable();
     while let Some((start, ch)) = iter.clone().peek(){
@@ -158,7 +284,7 @@ fn parse_symbols(line: &str) -> Vec<Symbol>{
                     end = p;
                 }
                 let capture = &line[*start..=end];
-                symbols.push(Symbol{ start: *start, capture: capture.to_string(), ty: Type::Dots});
+                symbols.push(Segment{ start: *start, capture: capture.to_string(), ty: Type::Dots});
             }
             ch if ch.is_numeric() =>{
                 let mut end = 0;
@@ -166,19 +292,13 @@ fn parse_symbols(line: &str) -> Vec<Symbol>{
                     end = p;
                 }
                 let capture = &line[*start..=end];
-                symbols.push(Symbol{start: *start, capture: capture.to_string(), ty: Type::Number});
+                symbols.push(Segment{start: *start, capture: capture.to_string(), ty: Type::Number});
             }
             _ => {
                 _ = iter.next();
-                symbols.push(Symbol{start: *start, capture: ch.to_string(), ty: Type::Symbol});
+                symbols.push(Segment{start: *start, capture: ch.to_string(), ty: Type::Symbol});
             }
         }
     }
     symbols
 }
-
-#[test]
-fn part2a(){}
-
-#[test]
-fn part2b(){}
